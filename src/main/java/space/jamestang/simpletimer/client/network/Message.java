@@ -3,6 +3,10 @@ package space.jamestang.simpletimer.client.network;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * This record class is only for the timer client to send messages to the server.
+ * the payload is only meant to be a byte array, which can be any data.
+ */
 public record Message(
         int magic,
         int version,
