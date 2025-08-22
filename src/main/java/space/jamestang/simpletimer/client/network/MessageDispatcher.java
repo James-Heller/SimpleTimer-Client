@@ -29,6 +29,8 @@ public class MessageDispatcher extends ChannelInboundHandlerAdapter {
      */
     private Message dispatch(Message message){
 
+        logger.info(message.toString());
+
         switch (message.type()){
             case MessageType.PONG -> {
                 logger.trace("Received PONG message: {}", message);

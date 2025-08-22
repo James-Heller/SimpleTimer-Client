@@ -8,24 +8,24 @@ import org.slf4j.LoggerFactory;
 import io.netty.channel.nio.NioIoHandler;
 import space.jamestang.simpletimer.client.network.Message;
 import space.jamestang.simpletimer.client.network.STClientChannelInitializer;
-import space.jamestang.simpletimer.client.utils.Serializer;
 
-import java.io.IOException;
 import java.util.Objects;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 public class STClient {
     private final IoHandlerFactory ioThreadFactory = NioIoHandler.newFactory();
     private final MultiThreadIoEventLoopGroup eventLoop = new MultiThreadIoEventLoopGroup(ioThreadFactory);
     private final Bootstrap client = new Bootstrap();
     private Channel channel;
+    private ScheduledFuture<?> heartbeatTask;
     private final Logger logger = LoggerFactory.getLogger(STClient.class);
     private final String host;
     private final int port;
-    private final String topic;
 
 
-    public STClient(String host, int port, String topic) {
+    public STClient(String host, int port) {
         client.group(eventLoop)
                 .channel(NioSocketChannel.class)
                 .handler(new STClientChannelInitializer())
@@ -33,7 +33,6 @@ public class STClient {
 
         this.host = host;
         this.port = port;
-        this.topic = topic;
 
         hookupShutdownHook();
     }
@@ -42,35 +41,65 @@ public class STClient {
      * Starts the STClient and connects it to the specified host and port.
      */
     public void start() {
+        logger.info("Starting STClient, attempting to connect to {}:{}", this.host, this.port);
 
-        client.connect(this.host, this.port).addListener((ChannelFuture future) -> {
+        ChannelFuture connectFuture = client.connect(this.host, this.port);
+        connectFuture.addListener((ChannelFuture future) -> {
             if (future.isSuccess()) {
                 channel = future.channel();
                 logger.info("STClient connected successfully to {}:{}", this.host, this.port);
 
-                channel.eventLoop().scheduleAtFixedRate(this::doHeartbeat, 0, 20, TimeUnit.SECONDS);
+                // 启动心跳任务 - 初始延迟1秒，然后每20秒执行一次
+                heartbeatTask = channel.eventLoop().scheduleAtFixedRate(
+                        this::doHeartbeat,
+                        1,
+                        20,
+                        TimeUnit.SECONDS
+                );
+                logger.info("Heartbeat task scheduled successfully");
+
+                // 添加通道关闭监听器
+                channel.closeFuture().addListener((ChannelFuture closeFuture) -> {
+                    logger.warn("Channel closed, stopping heartbeat");
+                    if (heartbeatTask != null && !heartbeatTask.isCancelled()) {
+                        heartbeatTask.cancel(false);
+                    }
+                });
+
             } else {
-                logger.error("Failed to connect STClient: {}", future.cause().getMessage());
+                logger.error("Failed to connect STClient to {}:{}, cause: {}",
+                        this.host, this.port, future.cause().getMessage());
                 eventLoop.shutdownGracefully();
             }
         });
+
+        // 等待连接完成
+        try {
+            connectFuture.sync();
+        } catch (InterruptedException e) {
+            logger.error("Connection interrupted: {}", e.getMessage());
+            Thread.currentThread().interrupt();
+        }
     }
 
 
-    public ChannelFuture scheduleAsync(long delay, Object payload) {
+    public ChannelFuture scheduleAsync(String topic, long delay, Supplier<byte[]> payloadTransformer) {
         Objects.requireNonNull(channel, "Channel is not initialized. Please start the client first.");
 
         if (delay < 1000) {
             throw new IllegalArgumentException("Delay must be at least 1000 milliseconds");
         }
-
-        var bytes = Serializer.INSTANCE.toBytes(payload);
+        var businessBytes = payloadTransformer.get();
+        if (businessBytes == null || businessBytes.length == 0) {
+            throw new IllegalArgumentException("Payload must not be null or empty");
+        }
+        var bytes = Message.createSchedule(topic, delay, businessBytes);
         return channel.writeAndFlush(bytes);
     }
 
-    public boolean schedule(long delay, Object payload) {
+    public boolean schedule(String topic, long delay, Supplier<byte[]> payloadTransformer) {
         try {
-            var future = scheduleAsync(delay, payload);
+            var future = scheduleAsync(topic, delay, payloadTransformer);
             future.sync();
             return future.isSuccess();
         } catch (InterruptedException e) {
@@ -81,15 +110,23 @@ public class STClient {
     }
 
 
-
-    private void doHeartbeat(){
-        var ping = Message.createPING(this.topic);
-        var result = channel.writeAndFlush(ping);
-        if (!result.isSuccess()){
-            logger.error("Failed to sent ping message with cause: {}", result.cause().getMessage());
+    private void doHeartbeat() {
+        if (channel == null || !channel.isActive()) {
+            logger.warn("Channel is not active, skipping heartbeat");
+            return;
         }
-    }
 
+        logger.debug("Sending heartbeat...");
+        var ping = Message.createPING("CLIENT-PING");
+        var result = channel.writeAndFlush(ping);
+        result.addListener((ChannelFuture future) -> {
+            if (future.isSuccess()) {
+                logger.debug("Heartbeat sent successfully");
+            } else {
+                logger.error("Failed to send ping message with cause: {}", future.cause().getMessage());
+            }
+        });
+    }
 
 
     private void hookupShutdownHook() {
@@ -104,8 +141,23 @@ public class STClient {
         }));
     }
 
-    public static void main(String[] args) throws IOException {
-        var instance = new STClient("localhost", 8080, "test-topic");
+//    public static void main(String[] args) {
+//        try {
+//            var instance = new STClient("localhost", 8080);
+//            instance.start();
+//
+//            // 保持程序运行
+//            LoggerFactory.getLogger(STClient.class).info("STClient started. Press Ctrl+C to stop.");
+//            Thread.currentThread().join();
+//
+//        } catch (Exception e) {
+//            System.err.println("Failed to start STClient: " + e.getMessage());
+//            LoggerFactory.getLogger(STClient.class).error("Failed to start STClient", e);
+//        }
+//    }
+
+    public static void main(String[] args) {
+        var instance = new STClient("localhost", 8080);
         instance.start();
     }
 

@@ -32,7 +32,7 @@ public class MessageDecoder extends ByteToMessageDecoder {
         int topicLength = in.readInt();
         byte[] topicBytes = new byte[topicLength];
         in.readBytes(topicBytes);
-        int delay = in.readInt();
+        long delay = in.readLong();
         int payloadLength = in.readableBytes();
         if (payloadLength < 0) {
             logger.warn("Payload length is negative: {}", payloadLength);

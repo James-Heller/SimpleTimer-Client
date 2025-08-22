@@ -18,8 +18,5 @@ public class TaskHandlerPoll {
         handlers.put(topic, handler);
     }
 
-    public void poll() {
-        // Polling logic for task handlers
-        // This method can be used to check for new tasks or updates
-    }
+
 }

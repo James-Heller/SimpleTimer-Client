@@ -19,7 +19,7 @@ public record Message(
 
     @Contract("!null -> new")
     public static @NotNull Message createPING(String topic){
-        return new Message(0x7355608, 1, 1, topic.length(), topic, 0, "PING".getBytes());
+        return createMessage(topic, 0, "PING".getBytes(), 1);
     }
 
     /**
@@ -32,10 +32,15 @@ public record Message(
      */
     @Contract("!null,_,!null -> new")
     public static @NotNull Message createSchedule(String topic, long delay, byte[] payload) {
-        if (delay < 1000) {
+        return createMessage(topic, delay, payload, 2);
+    }
+
+
+    private static @NotNull Message createMessage(String topic, long delay, byte[] payload, int type) {
+        if (delay < 1000 && type != 1) {
             throw new IllegalArgumentException("Delay must be at least 1000 milliseconds");
         }
-        return new Message(0x7355608, 1, 2, topic.length(), topic, delay, payload);
+        return new Message(0x7355608, 1, type, topic.length(), topic, delay, payload);
     }
 
     @Override
