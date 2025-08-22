@@ -6,7 +6,6 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import io.netty.channel.nio.NioIoHandler;
-import space.jamestang.simpletimer.client.handler.TaskHandlerPoll;
 import space.jamestang.simpletimer.client.network.Message;
 import space.jamestang.simpletimer.client.network.STClientChannelInitializer;
 
@@ -143,17 +142,17 @@ public class STClient {
     }
 
 
-    public static void main(String[] args) throws InterruptedException {
-        var instance = new STClient("localhost", 8080);
-        TaskHandlerPoll.INSTANCE.registerHandler("test-topic", msg -> {
-            System.out.println("Received message on topic: " + msg.topic());
-            System.out.println("Message payload: " + new String(msg.payload()));
-        });
-
-        instance.start();
-        Thread.sleep(3000);
-
-        instance.schedule("test-topic", 5000, "Hello, World!"::getBytes);
-    }
+//    public static void main(String[] args) throws InterruptedException {
+//        var instance = new STClient("localhost", 8080);
+//        TaskHandlerPoll.INSTANCE.registerHandler("test-topic", msg -> {
+//            System.out.println("Received message on topic: " + msg.topic());
+//            System.out.println("Message payload: " + new String(msg.payload()));
+//        });
+//
+//        instance.start();
+//        Thread.sleep(3000);
+//
+//        instance.schedule("test-topic", 5000, "Hello, World!"::getBytes);
+//    }
 
 }
