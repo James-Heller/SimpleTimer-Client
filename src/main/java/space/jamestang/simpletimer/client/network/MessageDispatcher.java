@@ -4,6 +4,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import space.jamestang.simpletimer.client.handler.TaskHandlerPoll;
 
 public class MessageDispatcher extends ChannelInboundHandlerAdapter {
 
@@ -44,6 +45,7 @@ public class MessageDispatcher extends ChannelInboundHandlerAdapter {
 
             case MessageType.TASK_TRIGGERED -> {
                 logger.info("Received TASK_TRIGGERED message: {}", message);
+                TaskHandlerPoll.INSTANCE.handle(message);
                 return null;
             }
 

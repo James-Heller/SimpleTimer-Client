@@ -6,6 +6,7 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import io.netty.channel.nio.NioIoHandler;
+import space.jamestang.simpletimer.client.handler.TaskHandlerPoll;
 import space.jamestang.simpletimer.client.network.Message;
 import space.jamestang.simpletimer.client.network.STClientChannelInitializer;
 
@@ -130,35 +131,21 @@ public class STClient {
 
 
     private void hookupShutdownHook() {
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            logger.info("Shutting down STClient...");
-            try {
-                eventLoop.shutdownGracefully();
-                logger.info("STClient shutdown complete.");
-            } catch (Exception e) {
-                logger.error("Error during shutdown: {}", e.getMessage());
-            }
-        }));
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
     }
 
-//    public static void main(String[] args) {
-//        try {
-//            var instance = new STClient("localhost", 8080);
-//            instance.start();
-//
-//            // 保持程序运行
-//            LoggerFactory.getLogger(STClient.class).info("STClient started. Press Ctrl+C to stop.");
-//            Thread.currentThread().join();
-//
-//        } catch (Exception e) {
-//            System.err.println("Failed to start STClient: " + e.getMessage());
-//            LoggerFactory.getLogger(STClient.class).error("Failed to start STClient", e);
-//        }
-//    }
-
-    public static void main(String[] args) {
-        var instance = new STClient("localhost", 8080);
-        instance.start();
+    public void shutdown() {
+        logger.info("Shutting down STClient...");
+        try {
+            if (channel != null) {
+                channel.close().sync();
+            }
+            eventLoop.shutdownGracefully().sync();
+            logger.info("STClient shutdown complete.");
+        } catch (InterruptedException e) {
+            logger.error("Error during shutdown: {}", e.getMessage());
+            Thread.currentThread().interrupt(); // Restore the interrupted status
+        }
     }
 
 }

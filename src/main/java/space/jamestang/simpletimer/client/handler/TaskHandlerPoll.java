@@ -1,5 +1,7 @@
 package space.jamestang.simpletimer.client.handler;
 
+import space.jamestang.simpletimer.client.network.Message;
+
 import java.util.HashMap;
 
 public class TaskHandlerPoll {
@@ -18,5 +20,16 @@ public class TaskHandlerPoll {
         handlers.put(topic, handler);
     }
 
+    public void handle(Message msg){
+        if (msg == null || msg.topic() == null) {
+            throw new IllegalArgumentException("Message and its topic must not be null");
+        }
 
+        TaskTriggeredHandler handler = handlers.get(msg.topic());
+        if (handler != null) {
+            handler.handle(msg);
+        } else {
+            throw new IllegalStateException("No handler registered for topic: " + msg.topic());
+        }
+    }
 }
