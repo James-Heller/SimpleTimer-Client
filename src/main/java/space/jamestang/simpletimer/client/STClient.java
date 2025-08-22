@@ -131,21 +131,29 @@ public class STClient {
 
 
     private void hookupShutdownHook() {
-        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            logger.info("Shutting down STClient...");
+            try {
+                eventLoop.shutdownGracefully();
+                logger.info("STClient shutdown complete.");
+            } catch (Exception e) {
+                logger.error("Error during shutdown: {}", e.getMessage());
+            }
+        }));
     }
 
-    public void shutdown() {
-        logger.info("Shutting down STClient...");
-        try {
-            if (channel != null) {
-                channel.close().sync();
-            }
-            eventLoop.shutdownGracefully().sync();
-            logger.info("STClient shutdown complete.");
-        } catch (InterruptedException e) {
-            logger.error("Error during shutdown: {}", e.getMessage());
-            Thread.currentThread().interrupt(); // Restore the interrupted status
-        }
+
+    public static void main(String[] args) throws InterruptedException {
+        var instance = new STClient("localhost", 8080);
+        TaskHandlerPoll.INSTANCE.registerHandler("test-topic", msg -> {
+            System.out.println("Received message on topic: " + msg.topic());
+            System.out.println("Message payload: " + new String(msg.payload()));
+        });
+
+        instance.start();
+        Thread.sleep(3000);
+
+        instance.schedule("test-topic", 5000, "Hello, World!"::getBytes);
     }
 
 }
