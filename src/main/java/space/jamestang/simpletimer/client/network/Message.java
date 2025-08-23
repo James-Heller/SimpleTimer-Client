@@ -45,14 +45,20 @@ public record Message(
 
     @Override
     public @NotNull String toString() {
+        // 避免在日志中打印大量的payload数据
+        String payloadPreview = payload.length > 100 
+            ? new String(payload, 0, 100, java.nio.charset.StandardCharsets.UTF_8) + "...(truncated)"
+            : new String(payload, java.nio.charset.StandardCharsets.UTF_8);
+            
         return "Message{" +
-                "magic=" + magic +
+                "magic=0x" + Integer.toHexString(magic) +
                 ", version=" + version +
                 ", type=" + type +
                 ", topicLength=" + topicLength +
                 ", topic='" + topic + '\'' +
                 ", delay=" + delay +
-                ", payload=" + new String(payload) +
+                ", payloadLength=" + payload.length +
+                ", payload='" + payloadPreview + '\'' +
                 '}';
     }
 }

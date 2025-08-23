@@ -1,53 +1,85 @@
 # SimpleTimer-Client
 
-SimpleTimer-Client 是 [SimpleTimer](https://github.com/James-Heller/SimpleTimer) 的官方 Java 客户端库。它用于与 SimpleTimer 服务端进行通信，实现定时任务的分发与处理。
+SimpleTimer-Client 是 [SimpleTimer](https://github.com/James-Heller/SimpleTimer) 的官方 Java 客户端库。用于与 SimpleTimer 服务端进行高性能定时任务通信，支持任务分发、回调和自动重连。
 
 ## 特性
-- 通过 Netty 实现高性能网络通信
-- 支持定时任务的注册、分发与回调
-- 简单易用的 API
-- 可扩展的任务处理机制
+- 基于 Netty 实现高性能异步网络通信
+- 支持定时任务注册、分发、回调
+- 自动重连与心跳机制，连接更可靠
+- 简单易用且可扩展的 API
+- 线程安全的处理器注册与分发
+- 灵活的配置系统，适合生产环境
 
 ## 安装
 
 ### 克隆仓库
-```
+```shell
 git clone https://github.com/James-Heller/SimpleTimer-Client.git
 ```
 
 ### 构建项目
 使用 Gradle 构建：
-```
+```shell
 cd SimpleTimer-Client
 ./gradlew build
 ```
 
-## 使用示例
-```java
-//构建一个客户端
-var client = new STClient("localhost", 8080);
-
-//注册一个用于处理某一话题的任务处理器，在定时结束后会调用该处理器
-TaskHandlerPoll.INSTANCE.registerHandler("test-topic", msg -> {
-    System.out.println("Received message on topic: " + msg.topic());
-    System.out.println("Message payload: " + new String(msg.payload()));
-});
-
-//启动客户端并开始调度任务
-/**
- *这里的 "test-topic" 是任务的主题，5000 是延迟时间（毫秒），
- * "Hello, World!" 是任务的负载。所有的负载都会被转换为字节数组发送到服务端。
- * 如果你对性能没有极致的要求，可以简单的使用 Jackson/FastJSON将数据转为JSON Bytes。
- * 定时器并不会对数据的格式做任何处理。
- * 
- */
-client.start();
-client.schedule("test-topic", 5000, "Hello, World!"::getBytes);
-```
-
 ## 依赖
 - Java 21+
-- Netty
+- Netty 4.2.4
+- SLF4J + Logback
+
+## 快速开始
+
+### 基本用法
+```java
+STClient client = new STClient("localhost", 8080);
+TaskHandlerPoll.INSTANCE.registerHandler("user-notification", msg -> {
+    System.out.println("用户通知: " + new String(msg.payload()));
+});
+client.start();
+while (!client.isConnected()) { Thread.sleep(100); }
+client.schedule("user-notification", 5000, () -> "您的订单已确认".getBytes());
+Runtime.getRuntime().addShutdownHook(new Thread(client::shutdown));
+```
+
+### 高级配置
+```java
+STClientConfig config = STClientConfig.builder("localhost", 8080)
+    .maxReconnectAttempts(5)
+    .initialReconnectDelay(2000)
+    .maxReconnectDelay(30000)
+    .heartbeatInterval(15)
+    .autoReconnect(true)
+    .build();
+STClient client = new STClient(config);
+```
+
+### 异步任务调度
+```java
+client.scheduleAsync("async-task", 10000, () -> "异步数据".getBytes())
+    .addListener(future -> {
+        if (future.isSuccess()) {
+            System.out.println("异步任务调度成功");
+        } else {
+            System.err.println("异步任务调度失败: " + future.cause().getMessage());
+        }
+    });
+```
+
+### 处理器管理
+```java
+TaskHandlerPoll.INSTANCE.registerHandler("topic", handler);
+TaskHandlerPoll.INSTANCE.unregisterHandler("topic");
+boolean exists = TaskHandlerPoll.INSTANCE.hasHandler("topic");
+```
+
+## 主要优化亮点
+- 自动重连与心跳机制，连接更稳定
+- 线程安全的处理器注册与分发
+- 灵活的配置系统，支持生产环境参数
+- 优雅关闭与资源管理
+- 完善的错误处理与日志
 
 ## 贡献
 欢迎提交 issue 或 pull request。
